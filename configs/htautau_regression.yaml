@@ -1,0 +1,105 @@
+name: htautau_mass_regression
+
+model:
+  lrs_config:
+    initial: 1e-7
+    max: 5e-4
+    end: 1e-5
+    pct_start: 0.01
+    weight_decay: 1e-5
+  model:
+    class_path: salt.models.SaltModel
+    init_args:
+      init_nets:
+        # Embed each particle-flow constituent into a 256-dim vector
+        - input_name: flow
+          dense_config:
+            output_size: &embed_dim 256
+            hidden_layers: [256]
+            activation: &activation ReLU
+        # Embed each track into the same embedding space
+        - input_name: tracks
+          dense_config:
+            output_size: *embed_dim
+            hidden_layers: [256]
+            activation: *activation
+      encoder:
+        class_path: salt.models.Transformer
+        init_args:
+          embed_dim: *embed_dim
+          num_layers: 6
+          out_dim: &out_dim 128
+          attn_type: torch-math
+          attn_kwargs:
+            num_heads: 8
+          dense_kwargs:
+            activation: *activation
+            gated: True
+          num_registers: 8
+      pool_net:
+        class_path: salt.models.GlobalAttentionPooling
+        init_args: { input_size: *out_dim }
+      tasks:
+        class_path: torch.nn.ModuleList
+        init_args:
+          modules:
+            - class_path: salt.models.RegressionTask
+              init_args:
+                name: mass_regression
+                input_name: jets
+                targets: [GhostHBosonsMass]
+                # Fill norm_params from the output of prepare_htautau.py
+                norm_params:
+                  mean: [FILL_AFTER_PREP]
+                  std:  [FILL_AFTER_PREP]
+                loss:
+                  class_path: torch.nn.MSELoss
+                  init_args: {}
+                dense_config:
+                  input_size: *out_dim
+                  output_size: 1
+                  hidden_layers: [128, 64, 32]
+                  activation: *activation
+
+data:
+  input_map:
+    jets: jets
+    flow: flow
+    tracks: tracks
+  global_object: jets
+  variables:
+    jets:
+      - pt
+      - eta
+      - mass
+    flow:
+      - flow_pt
+      - flow_energy
+      - flow_deta
+      - flow_dphi
+      - flow_dr
+    tracks:
+      - d0                                  # decay vertex info — unique to tracks
+      - z0SinTheta                          # decay vertex info — unique to tracks
+      - qOverP                              # charge sign — not in flow
+      - qOverPUncertainty                   # track fit quality
+      - numberOfPixelHits                   # track quality
+      - numberOfSCTHits                     # track quality
+      - numberOfInnermostPixelLayerHits     # track quality
+      - numberOfNextToInnermostPixelLayerHits
+      - leptonID                            # e/mu ID — not in flow
+  train_file: /home/jdiya/htautau_regression/data/htautau_train.h5
+  val_file: /home/jdiya/htautau_regression/data/htautau_val.h5
+  norm_dict: /home/jdiya/htautau_regression/data/norm_dict.yaml
+  class_dict: /home/jdiya/htautau_regression/data/class_dict.yaml
+  num_train: -1
+  num_val: -1
+  num_test: -1
+  batch_size: 400
+  num_workers: 8
+
+trainer:
+  max_epochs: 50
+  accelerator: gpu
+  devices: 1
+  precision: 16-mixed

@@ -1,0 +1,10 @@
+universe       = vanilla
+executable     = /bin/bash
+arguments      = /home/jdiya/htautau_regression/job_scripts/run_train.sh
+output         = /home/jdiya/htautau_regression/logs/train.out
+error          = /home/jdiya/htautau_regression/logs/train.err
+log            = /home/jdiya/htautau_regression/logs/train.log
+request_memory = 32GB
+request_cpus   = 8
+request_gpus   = 1
+queue

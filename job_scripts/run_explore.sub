@@ -1,0 +1,9 @@
+universe    = vanilla
+executable  = /bin/bash
+arguments   = /home/jdiya/htautau_regression/job_scripts/run_explore.sh
+output      = /home/jdiya/htautau_regression/logs/explore.out
+error       = /home/jdiya/htautau_regression/logs/explore.err
+log         = /home/jdiya/htautau_regression/logs/explore.log
+request_memory = 16GB
+request_cpus   = 2
+queue
