@@ -1,3 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 source ~/miniforge3/bin/activate myenv
-python ~/htautau_regression/python_scripts/prepare_htautau.py
+python -u ~/Htautau-mass-regression/python_scripts/prepare_htautau.py
+echo "PREP EXIT CODE: $?"

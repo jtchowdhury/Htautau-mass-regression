@@ -1,9 +1,9 @@
 universe       = vanilla
 executable     = /bin/bash
-arguments      = /home/jdiya/htautau_regression/job_scripts/run_prep.sh
-output         = /home/jdiya/htautau_regression/logs/prep.out
-error          = /home/jdiya/htautau_regression/logs/prep.err
-log            = /home/jdiya/htautau_regression/logs/prep.log
-request_memory = 16GB
+arguments      = /home/jdiya/Htautau-mass-regression/job_scripts/run_prep.sh
+output         = /home/jdiya/Htautau-mass-regression/logs/prep.out
+error          = /home/jdiya/Htautau-mass-regression/logs/prep.err
+log            = /home/jdiya/Htautau-mass-regression/logs/prep.log
+request_memory = 24GB
 request_cpus   = 4
 queue

@@ -50,8 +50,8 @@ model:
                 targets: [GhostHBosonsMass]
                 # Fill norm_params from the output of prepare_htautau.py
                 norm_params:
-                  mean: [FILL_AFTER_PREP]
-                  std:  [FILL_AFTER_PREP]
+                  mean: [127386.13]
+                  std:  [36738.14]
                 loss:
                   class_path: torch.nn.MSELoss
                   init_args: {}
@@ -81,6 +81,10 @@ data:
     tracks:
       - d0                                  # decay vertex info — unique to tracks
       - z0SinTheta                          # decay vertex info — unique to tracks
+      - lifetimeSignedD0                    # signed d0 w.r.t jet axis (tau displacement)
+      - lifetimeSignedZ0SinTheta
+      - lifetimeSignedD0Significance        # d0/σ(d0), signed — key tau-tagging variable
+      - lifetimeSignedZ0SinThetaSignificance
       - qOverP                              # charge sign — not in flow
       - qOverPUncertainty                   # track fit quality
       - numberOfPixelHits                   # track quality
@@ -88,18 +92,19 @@ data:
       - numberOfInnermostPixelLayerHits     # track quality
       - numberOfNextToInnermostPixelLayerHits
       - leptonID                            # e/mu ID — not in flow
-  train_file: /home/jdiya/htautau_regression/data/htautau_train.h5
-  val_file: /home/jdiya/htautau_regression/data/htautau_val.h5
-  norm_dict: /home/jdiya/htautau_regression/data/norm_dict.yaml
-  class_dict: /home/jdiya/htautau_regression/data/class_dict.yaml
+  train_file: /home/jdiya/Htautau-mass-regression/data/htautau_train.h5
+  val_file: /home/jdiya/Htautau-mass-regression/data/htautau_val.h5
+  norm_dict: /home/jdiya/Htautau-mass-regression/data/norm_dict.yaml
+  class_dict: /home/jdiya/Htautau-mass-regression/data/class_dict.yaml
   num_train: -1
   num_val: -1
   num_test: -1
-  batch_size: 400
-  num_workers: 8
+  batch_size: 128
+  num_workers: 2
 
 trainer:
   max_epochs: 50
   accelerator: gpu
   devices: 1
-  precision: 16-mixed
+  precision: bf16-mixed
+  gradient_clip_val: 1.0
