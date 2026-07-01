@@ -1,16 +1,23 @@
 """
 analyze_predictions.py
 ----------------------
-Analysis starter for a salt `test` predictions h5. Evaluates the H->tautau
-Higgs-mass regression and reproduces the resolution views from Notes.txt.
+Analysis for a salt `test` predictions h5 (flat-mass sample, 802168).
+Produces two plots in the style of explore_htautau.py:
+
+  1. mass_regressed.png   truth Higgs / reco / REGRESSED mass distributions
+  2. resolution.png       response (m/m_truthHiggs - 1): reco vs regressed
 
 Usage:
     python analyze_predictions.py <predictions.h5>
 
 Fields (from salt test output):
-    truth : jets['GhostHBosonsMass']                          (MeV)
-    pred  : jets['htautau_mass_regression_GhostHBosonsMass']  (MeV)
-    reco  : jets['mass']                                      (MeV)
+    truth     : jets['GhostHBosonsMass']                          (MeV)
+    regressed : jets['htautau_mass_regression_GhostHBosonsMass']  (MeV)
+    reco      : jets['mass']                                      (MeV)
+
+Note: truth-jet mass is not in this file (not carried through
+prepare_htautau.py). Add 'R10TruthLabel_R22v1_TruthJetMass' to the jet
+output there and regenerate if you want it on the mass plot.
 """
 import os
 import sys
@@ -23,6 +30,18 @@ import matplotlib.pyplot as plt
 TRUTH_FIELD = "GhostHBosonsMass"
 PRED_FIELD  = "htautau_mass_regression_GhostHBosonsMass"
 
+# colours matching explore_htautau.py
+C_TRUTH = "#1D9E75"   # teal
+C_RECO  = "#5B4FCF"   # purple
+C_REG   = "#D85A30"   # coral (the regressed / new curve)
+
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "axes.grid": True,
+    "grid.alpha": 0.3,
+    "font.size": 12,
+})
+
 
 def load(path):
     with h5py.File(path, "r") as f:
@@ -30,23 +49,8 @@ def load(path):
     true = j[TRUTH_FIELD].astype(np.float64) / 1e3   # GeV
     pred = j[PRED_FIELD].astype(np.float64) / 1e3
     reco = j["mass"].astype(np.float64) / 1e3
-    pt   = j["pt"].astype(np.float64) / 1e3
-    m = (true > 0) & np.isfinite(true) & np.isfinite(pred)
-    return true[m], pred[m], reco[m], pt[m]
-
-
-def profile(x, y, bins):
-    cx, med, lo, hi = [], [], [], []
-    for i in range(len(bins) - 1):
-        s = (x >= bins[i]) & (x < bins[i + 1])
-        if s.sum() < 20:
-            continue
-        q25, q50, q75 = np.percentile(y[s], [25, 50, 75])
-        cx.append((bins[i] + bins[i + 1]) / 2)
-        med.append(q50)
-        lo.append(q50 - q25)
-        hi.append(q75 - q50)
-    return (np.array(cx), np.array(med), np.array(lo), np.array(hi))
+    m = (true > 0) & np.isfinite(true) & np.isfinite(pred) & np.isfinite(reco)
+    return true[m], pred[m], reco[m]
 
 
 def main():
@@ -54,58 +58,60 @@ def main():
         print("usage: python analyze_predictions.py <predictions.h5>")
         return
     path = sys.argv[1]
-    true, pred, reco, pt = load(path)
-    resp = pred / true - 1
+    true, pred, reco = load(path)
+
+    resp_reco = reco / true - 1
+    resp_reg  = pred / true - 1
+
+    def stats(r):
+        return np.median(r), np.percentile(r, 75) - np.percentile(r, 25)
+
+    med_reco, iqr_reco = stats(resp_reco)
+    med_reg,  iqr_reg  = stats(resp_reg)
 
     print(f"N = {true.size:,}")
-    print(f"true mean {true.mean():.1f} GeV | pred mean {pred.mean():.1f} GeV | reco mean {reco.mean():.1f} GeV")
-    print(f"RMSE {np.sqrt(np.mean((pred - true) ** 2)):.2f} GeV | MAE {np.mean(np.abs(pred - true)):.2f} GeV")
-    print(f"median response {np.median(resp):+.3f} | IQR {np.percentile(resp, 75) - np.percentile(resp, 25):.3f}")
+    print(f"true mean {true.mean():.1f} GeV | reco mean {reco.mean():.1f} GeV | regressed mean {pred.mean():.1f} GeV")
+    print(f"RMSE  reco {np.sqrt(np.mean((reco-true)**2)):.2f} GeV | regressed {np.sqrt(np.mean((pred-true)**2)):.2f} GeV")
+    print(f"reco       response median {med_reco:+.3f}  IQR {iqr_reco:.3f}")
+    print(f"regressed  response median {med_reg:+.3f}  IQR {iqr_reg:.3f}")
 
     outdir = os.path.join(os.path.dirname(os.path.abspath(path)), "analysis_plots")
     os.makedirs(outdir, exist_ok=True)
 
-    # 1. response: reco vs regressed
+    # ---- Plot 1: mass distributions (truth Higgs / reco / regressed) ----
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.hist(reco / true - 1, bins=100, range=(-1, 1), histtype="step",
-            density=True, lw=2, label="reco / true")
-    ax.hist(resp, bins=100, range=(-1, 1), histtype="step",
-            density=True, lw=2, label="regressed / true")
-    ax.axvline(0, color="k", ls="--", lw=1)
-    ax.set_xlabel(r"$m / m_\mathrm{true} - 1$")
-    ax.set_ylabel("normalised")
-    ax.set_title("Mass response: reco vs regressed")
+    ax.hist(true, bins=80, range=(40, 250), histtype="step", density=True,
+            color=C_TRUTH, lw=2, ls="-",  label="truth Higgs")
+    ax.hist(reco, bins=80, range=(40, 250), histtype="step", density=True,
+            color=C_RECO,  lw=2, ls=":",  label="reco")
+    ax.hist(pred, bins=80, range=(40, 250), histtype="step", density=True,
+            color=C_REG,   lw=2, ls="-",  label="regressed")
+    ax.set_xlabel("Jet mass [GeV]")
+    ax.set_ylabel("Normalised")
+    ax.set_title("Flat-mass BSM (802168): regressed mass")
     ax.legend()
-    fig.savefig(os.path.join(outdir, "response.png"), dpi=150, bbox_inches="tight")
+    fig.tight_layout()
+    fig.savefig(os.path.join(outdir, "mass_regressed.png"), dpi=150)
     plt.close()
 
-    # 2. mass distributions
-    fig, ax = plt.subplots(figsize=(8, 6))
-    for arr, lab in [(true, "true Higgs"), (pred, "regressed"), (reco, "reco")]:
-        ax.hist(arr, bins=80, range=(40, 250), histtype="step", density=True, lw=2, label=lab)
-    ax.set_xlabel("mass [GeV]")
-    ax.set_ylabel("normalised")
-    ax.set_title("Mass distributions")
-    ax.legend()
-    fig.savefig(os.path.join(outdir, "mass_dists.png"), dpi=150, bbox_inches="tight")
+    # ---- Plot 2: mass resolution (reco vs regressed) ----
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.hist(resp_reco, bins=100, range=(-1, 1), histtype="step", density=True,
+            color=C_RECO, lw=2,
+            label=f"reco / truth        (median={med_reco:.2f}, IQR={iqr_reco:.2f})")
+    ax.hist(resp_reg, bins=100, range=(-1, 1), histtype="step", density=True,
+            color=C_REG, lw=2,
+            label=f"regressed / truth  (median={med_reg:.2f}, IQR={iqr_reg:.2f})")
+    ax.axvline(0, color="black", ls="--", lw=1, alpha=0.5, label="perfect response")
+    ax.set_xlabel(r"$(m / m_\mathrm{truth\,Higgs}) - 1$")
+    ax.set_ylabel("Normalised")
+    ax.set_title("Mass resolution: reco vs regressed (flat-mass BSM)")
+    ax.legend(fontsize=10)
+    fig.tight_layout()
+    fig.savefig(os.path.join(outdir, "resolution.png"), dpi=150)
     plt.close()
 
-    # 3. response vs true mass
-    bins = np.arange(50, 300, 20)
-    fig, ax = plt.subplots(figsize=(8, 6))
-    cx, med, lo, hi = profile(true, resp, bins)
-    ax.errorbar(cx, med, yerr=[lo, hi], fmt="o-", capsize=3, label="regressed")
-    cx2, med2, lo2, hi2 = profile(true, reco / true - 1, bins)
-    ax.errorbar(cx2, med2, yerr=[lo2, hi2], fmt="s--", capsize=3, label="reco")
-    ax.axhline(0, color="k", ls="--", lw=1)
-    ax.set_xlabel("true Higgs mass [GeV]")
-    ax.set_ylabel("median response")
-    ax.set_title("Response vs true mass")
-    ax.legend()
-    fig.savefig(os.path.join(outdir, "response_vs_mass.png"), dpi=150, bbox_inches="tight")
-    plt.close()
-
-    print(f"\nplots -> {outdir}")
+    print(f"\nplots -> {outdir}/mass_regressed.png, {outdir}/resolution.png")
 
 
 if __name__ == "__main__":
