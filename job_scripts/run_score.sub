@@ -1,0 +1,10 @@
+universe       = vanilla
+executable     = /bin/bash
+arguments      = /home/jdiya/Htautau-mass-regression/job_scripts/run_score.sh
+output         = /home/jdiya/Htautau-mass-regression/logs/score.out
+error          = /home/jdiya/Htautau-mass-regression/logs/score.err
+log            = /home/jdiya/Htautau-mass-regression/logs/score.log
+request_memory = 16GB
+request_cpus   = 4
+request_gpus   = 1
+queue

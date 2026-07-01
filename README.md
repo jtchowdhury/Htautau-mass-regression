@@ -107,21 +107,3 @@ After a successful prep run, `prep.out` prints a `norm_params:` block (target me
 If those differ from the values in `htautau_regression.yaml`, update them there before training.
 
 ---
-
-## Gotchas / lessons learned
-
-These cost real debugging time; keep them in mind before changing the pipeline.
-
-- **HDF5 compound-dataset writes.** Assigning to a *single field* of an on-disk
-  compound dataset (`dset["field"][a:b] = x`) silently does nothing. The only reliable
-  way to populate `jets`/`flow`/`tracks` is to write a *complete* numpy structured array
-  to a row slice (`dset[a:b] = arr`). `prepare_htautau.py` does this and then verifies the
-  output is non-zero — never ship a silently-empty file again.
-- **Always check the target is non-zero** in the produced `.h5` before training. An
-  all-zero `GhostHBosonsMass` trains a model that predicts a constant and looks "fine"
-  until you inspect it.
-- **fp16 instability.** `precision: 16-mixed` tends to produce NaN losses after a couple
-  of epochs as the LR ramps up. Use `bf16-mixed` + gradient clipping.
-- **One source of truth for sync.** Keep the cluster copy in sync via a single method
-  (git *or* scp, not both). Mixed laptop/remote/cluster edits caused divergent branches
-  and a stuck rebase. The generated `data/`, `logs/`, and `*.h5` should stay out of git.
