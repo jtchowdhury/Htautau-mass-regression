@@ -63,9 +63,17 @@ def main():
     for r in rows:
         print(f"{r['epoch']:>5} {r['n']:>8} {r['rmse']:>10.2f} "
               f"{r['mae']:>9.2f} {r['bias']:>+8.3f} {r['iqr']:>7.3f}")
-    best = rows[0]
-    print(f"\nBest by RMSE: epoch {best['epoch']}  "
-          f"(RMSE {best['rmse']:.2f} GeV, bias {best['bias']:+.3f}, IQR {best['iqr']:.3f})")
+    best_rmse = rows[0]
+    best_iqr  = min(rows, key=lambda r: r["iqr"])
+    best_bias = min(rows, key=lambda r: abs(r["bias"]))
+    print(f"\nBest by RMSE:             epoch {best_rmse['epoch']}  "
+          f"(RMSE {best_rmse['rmse']:.2f} GeV, bias {best_rmse['bias']:+.3f}, IQR {best_rmse['iqr']:.3f})")
+    print(f"Best by IQR (resolution): epoch {best_iqr['epoch']}  "
+          f"(IQR {best_iqr['iqr']:.3f}, bias {best_iqr['bias']:+.3f}, RMSE {best_iqr['rmse']:.2f} GeV)")
+    print(f"Best by |bias|:           epoch {best_bias['epoch']}  "
+          f"(bias {best_bias['bias']:+.3f}, IQR {best_bias['iqr']:.3f}, RMSE {best_bias['rmse']:.2f} GeV)")
+    print("\nFor a mass regression, prefer the best-IQR epoch (tightest peak), "
+          "as long as its bias is small.")
 
 
 if __name__ == "__main__":

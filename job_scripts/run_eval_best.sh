@@ -7,7 +7,7 @@ cd ~/Htautau-mass-regression
 # No --data.num_test cap => uses ALL ~1.4M validation jets (run_score used 200k).
 # Overwrites that epoch's __test_htautau_val.h5 with the full-stats version.
 
-EPOCH=014     # <-- set to the best epoch from score_checkpoints.py
+EPOCH=047     # <-- best epoch from the val-loss curve
 RUN=~/Htautau-mass-regression/logs/htautau_mass_regression_20260629-T044141
 CKPT=$RUN/ckpts/epoch=${EPOCH}-val_loss=0.00000.ckpt
 VAL=~/Htautau-mass-regression/data/htautau_val.h5
