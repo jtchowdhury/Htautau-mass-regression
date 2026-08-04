@@ -72,6 +72,11 @@ FIELDS = [
     "GhostHBosonsPt",
 ]
 
+# Truth Higgs-mass window [GeV] for the mass-cut study (set MASS_MIN=None to disable).
+# 75-175 GeV brackets the SM Higgs (125). Matches the cut in prepare_htautau.py.
+MASS_MIN = 75.0
+MASS_MAX = 175.0
+
 # Color per sample
 COLORS = {
     "Flat-mass BSM (802168)": "#1D9E75",  # teal
@@ -143,6 +148,8 @@ def select_htautau(jets):
         (d["reco_mass"] > 0) & np.isfinite(d["reco_mass"]) &
         (d["reco_pt"]   > 0) & np.isfinite(d["reco_pt"])
     )
+    if MASS_MIN is not None:                     # truth Higgs-mass window cut
+        valid &= (d["higgs_mass"] >= MASS_MIN) & (d["higgs_mass"] <= MASS_MAX)
     return {k: v[valid] for k, v in d.items()}
 
 

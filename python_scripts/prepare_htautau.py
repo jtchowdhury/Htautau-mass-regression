@@ -72,6 +72,12 @@ TRACK_VARS = [
 TARGET      = "GhostHBosonsMass"
 LABEL       = "R10TruthLabel_R22v1"
 HTAUTAU_HAD = 16
+
+# Truth Higgs-mass window (MeV) for the refined training sample.
+# 75-175 GeV brackets the SM Higgs (125 GeV). Set MASS_MIN=None to disable.
+MASS_MIN = 75000.0
+MASS_MAX = 175000.0
+
 TRAIN_FRAC  = 0.70
 VAL_FRAC    = 0.15
 SEED        = 42
@@ -179,6 +185,8 @@ def main():
             label  = f["jets"][LABEL][:]
             target = f["jets"][TARGET][:]
             sel    = (label == HTAUTAU_HAD) & (target > 0) & np.isfinite(target)
+            if MASS_MIN is not None:
+                sel &= (target >= MASS_MIN) & (target <= MASS_MAX)
             sel_idx = np.where(sel)[0]
             n_sel   = sel_idx.size
             print(f"  selected {n_sel:,} H->tautau jets")

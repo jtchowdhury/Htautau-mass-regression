@@ -72,10 +72,20 @@ def main():
     ap.add_argument("--ref", type=float, default=None,
                     help="vertical reference line on the mass plot [GeV] "
                          "(defaults to --mh if given)")
+    ap.add_argument("--mcut", type=float, nargs=2, default=None, metavar=("LO", "HI"),
+                    help="keep only jets with LO <= truth Higgs mass [GeV] <= HI")
     args = ap.parse_args()
 
     true, pred, reco = load(args.path, args.mh)
     tag = args.label.replace(" ", "_")
+
+    if args.mcut:                       # cut on truth Higgs mass
+        lo, hi = args.mcut
+        keep = (true >= lo) & (true <= hi)
+        true, pred, reco = true[keep], pred[keep], reco[keep]
+        tag += f"_m{lo:.0f}-{hi:.0f}"
+        args.label += f" [{lo:.0f}-{hi:.0f} GeV]"
+
     ref = args.ref if args.ref is not None else args.mh
     per_jet_truth = args.mh is None
 
@@ -90,7 +100,8 @@ def main():
     print(f"  reco      mean {reco.mean():.1f} GeV | response med {mr:+.3f} IQR {ir:.3f} | residual med {dr:+.1f} GeV")
     print(f"  regressed mean {pred.mean():.1f} GeV | response med {mg:+.3f} IQR {ig:.3f} | residual med {dg:+.1f} GeV")
 
-    outdir = os.path.join(os.path.dirname(os.path.abspath(args.path)), "analysis_plots")
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    outdir = os.path.join(base_dir, "plots", "analysis_plots")
     os.makedirs(outdir, exist_ok=True)
 
     # ---- 1. mass distributions (the "two peaks" view) ----
