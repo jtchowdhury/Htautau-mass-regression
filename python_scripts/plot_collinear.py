@@ -1,24 +1,23 @@
 """
 plot_collinear.py
 -----------------
-Truth-level collinear Higgs-mass estimate from the fields that ARE available.
+Five-curve mass comparison for the flat-mass BSM sample (802168):
 
-DATA LIMITATIONS (documented on the plot):
-  * Jet phi is NOT stored, so Delta-phi(jet, MET) cannot be computed. We
-    therefore ASSUME the MET is collinear with the jet (cos d-phi = 1) -- which
-    is exactly the collinear approximation's own premise. Consequence: the
-    |d-phi| <= pi/2 cut cannot be applied; all selected jets are kept.
-  * Only TRUTH MET (truth_met_met) is available -> this is an idealized estimate,
-    not what a reco-MET analysis would give.
+  1. truth Higgs mass          GhostHBosonsMass
+  2. truth jet mass            R10TruthLabel_R22v1_TruthJetMass
+  3. reco jet mass             mass
+  4. collinear (truth jet)     m_tjet * (1 + MET / pt_tjet)
+  5. collinear (reco jet)      m_reco * (1 + MET / pt_reco)
 
-FORMULA AMBIGUITY (both shown; confirm with advisor):
-  * literal   : x = MET / pt_jet   ->  m = m_jet / x = m_jet * pt_jet / MET
-                (comes out very large -- likely NOT the intended convention)
-  * physical  : m = m_jet * (1 + MET / pt_jet)
-                (the standard collinear scaling; shifts reco mass up modestly)
+The collinear correction adds the neutrino momentum (inferred from MET) back to
+the jet. Two forced assumptions (documented on the plot):
+  * jet phi is not stored -> MET assumed collinear with the jet (cos d-phi = 1),
+    so MET_along = MET and the |d-phi|<=pi/2 cut cannot be applied.
+  * only TRUTH MET (truth_met_met) exists -> idealized estimate.
 
-Reads sample 802168 directly (has truth_met_met); selection R10TruthLabel==16
-and GhostHBosonsMass>0, matching the training selection.
+Convention: the physical collinear scaling m = m_jet*(1 + MET/pt) is used
+(not the literal m_jet/x, which gives unphysically large masses -- confirm with
+advisor).
 
 Usage:
     python plot_collinear.py
@@ -35,57 +34,61 @@ SRC = ("/data/mfujimot/tddOutput/forRegression/"
        "user.mfujimot.802168.e8558_s4159_r15530_p6646."
        "tdd.FatJets.25_2_56.26-05-16_prod_160526_output.h5")
 
-C_TRUTH = "#1D9E75"; C_RECO = "#5B4FCF"; C_COLL = "#D85A30"
-
 
 def main():
-    pt, m, mh, met = [], [], [], []
+    reco_m, reco_pt, tj_m, tj_pt, mh, met = [], [], [], [], [], []
     for fp in sorted(glob.glob(SRC + "/*.h5")):
         with h5py.File(fp, "r") as h:
             j = h["jets"]
-            lab = j["R10TruthLabel_R22v1"][:]
-            gm  = j["GhostHBosonsMass"][:]
-            sel = (lab == 16) & (gm > 0)
-            pt.append(j["pt"][:][sel])
-            m.append(j["mass"][:][sel])
-            mh.append(gm[sel])
+            sel = (j["R10TruthLabel_R22v1"][:] == 16) & (j["GhostHBosonsMass"][:] > 0)
+            reco_m.append(j["mass"][:][sel])
+            reco_pt.append(j["pt"][:][sel])
+            tj_m.append(j["R10TruthLabel_R22v1_TruthJetMass"][:][sel])
+            tj_pt.append(j["R10TruthLabel_R22v1_TruthJetPt"][:][sel])
+            mh.append(j["GhostHBosonsMass"][:][sel])
             met.append(j["truth_met_met"][:][sel])
-    pt  = np.concatenate(pt)  / 1e3     # GeV
-    m   = np.concatenate(m)   / 1e3
-    mh  = np.concatenate(mh)  / 1e3
-    met = np.concatenate(met) / 1e3
+    reco_m  = np.concatenate(reco_m)  / 1e3    # GeV
+    reco_pt = np.concatenate(reco_pt) / 1e3
+    tj_m    = np.concatenate(tj_m)    / 1e3
+    tj_pt   = np.concatenate(tj_pt)   / 1e3
+    mh      = np.concatenate(mh)      / 1e3
+    met     = np.concatenate(met)     / 1e3
 
-    good = (pt > 0) & np.isfinite(m) & np.isfinite(met)
-    pt, m, mh, met = pt[good], m[good], mh[good], met[good]
+    # need positive pt for the collinear correction
+    ok = (reco_pt > 0) & (tj_pt > 0) & np.isfinite(met)
+    reco_m, reco_pt, tj_m, tj_pt, mh, met = (a[ok] for a in (reco_m, reco_pt, tj_m, tj_pt, mh, met))
 
-    x          = met / pt                 # cos d-phi = 1 assumed
-    m_literal  = np.where(x > 0, m / x, np.nan)      # advisor's formula, literal
-    m_physical = m * (1.0 + x)                        # standard collinear scaling
+    coll_truth = tj_m   * (1.0 + met / tj_pt)     # truth jet mass + truth jet pt
+    coll_reco  = reco_m * (1.0 + met / reco_pt)   # reco jet mass + reco jet pt
 
-    print(f"N = {m.size:,}")
-    print(f"  truth Higgs        median {np.median(mh):.1f} GeV")
-    print(f"  reco jet mass      median {np.median(m):.1f} GeV")
-    print(f"  collinear PHYSICAL median {np.median(m_physical):.1f} GeV   [m_jet*(1+MET/pt)]")
-    print(f"  collinear LITERAL  median {np.nanmedian(m_literal):.1f} GeV   [m_jet*pt/MET] (check convention!)")
+    print(f"N = {mh.size:,}")
+    for name, arr in [("truth Higgs", mh), ("truth jet mass", tj_m),
+                      ("reco jet mass", reco_m),
+                      ("collinear (truth)", coll_truth),
+                      ("collinear (reco)", coll_reco)]:
+        print(f"  {name:20s} median {np.median(arr):6.1f} GeV")
 
     outdir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                           "plots", "analysis_plots")
     os.makedirs(outdir, exist_ok=True)
 
-    fig, ax = plt.subplots(figsize=(8, 6))
-    ax.hist(mh,         bins=80, range=(40, 300), histtype="step", density=True,
-            color=C_TRUTH, lw=2, ls="-",  label="truth Higgs")
-    ax.hist(m,          bins=80, range=(40, 300), histtype="step", density=True,
-            color=C_RECO,  lw=2, ls=":",  label="reco jet mass")
-    ax.hist(m_physical, bins=80, range=(40, 300), histtype="step", density=True,
-            color=C_COLL,  lw=2, ls="-",
-            label=r"collinear $m_\mathrm{jet}(1+\mathrm{MET}/p_T)$")
-    ax.axvline(125, color="black", ls="--", lw=1, alpha=0.5, label="125 GeV")
+    curves = [
+        (mh,         "truth Higgs",          "#1D9E75", "-",  2.4),
+        (tj_m,       "truth jet mass",       "#2C7FB8", "--", 2.0),
+        (reco_m,     "reco jet mass",        "#5B4FCF", ":",  2.0),
+        (coll_truth, "collinear (truth jet)","#D85A30", "-",  2.0),
+        (coll_reco,  "collinear (reco jet)", "#B00020", "-",  2.0),
+    ]
+    fig, ax = plt.subplots(figsize=(9, 6))
+    for arr, lab, col, ls, lw in curves:
+        ax.hist(arr, bins=90, range=(40, 300), histtype="step", density=True,
+                color=col, ls=ls, lw=lw, label=lab)
+    ax.axvline(125, color="black", ls="--", lw=1, alpha=0.4, label="125 GeV")
     ax.set_xlabel("mass [GeV]")
     ax.set_ylabel("Normalised")
-    ax.set_title("Truth-level collinear mass (flat-mass BSM)\n"
-                 "assumes MET $\\parallel$ jet (no jet $\\phi$); truth MET",
-                 fontsize=11)
+    ax.set_title("Collinear mass comparison (flat-mass BSM)\n"
+                 "collinear = $m_\\mathrm{jet}(1+\\mathrm{MET}/p_T)$; truth MET, "
+                 "MET $\\parallel$ jet assumed", fontsize=11)
     ax.legend(fontsize=9)
     fig.tight_layout()
     out = os.path.join(outdir, "collinear_mass.png")
